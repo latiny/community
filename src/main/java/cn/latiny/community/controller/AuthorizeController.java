@@ -1,17 +1,17 @@
 package cn.latiny.community.controller;
 
+import cn.latiny.community.domain.UserDomain;
 import cn.latiny.community.model.AccessTokenDTO;
 import cn.latiny.community.model.GithubUser;
 import cn.latiny.community.provider.GithubProvider;
-import com.alibaba.fastjson.JSON;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import cn.latiny.community.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * @author Latiny
@@ -24,6 +24,8 @@ public class AuthorizeController {
 
     @Autowired
     private GithubProvider githubProvider;
+    @Autowired
+    private UserService userService;
     @Value("${github.client.id}")
     private String clientId;
     @Value("${github.redirect.uri}")
@@ -33,7 +35,8 @@ public class AuthorizeController {
 
     @GetMapping("/callback")
     public String callback(@RequestParam(name = "code") String code,
-                           @RequestParam(name = "state") String state) {
+                           @RequestParam(name = "state") String state,
+                           HttpServletRequest request) {
         AccessTokenDTO accessTokenDTO = new AccessTokenDTO();
         accessTokenDTO.setClient_id(clientId);
         accessTokenDTO.setCode(code);
@@ -42,9 +45,16 @@ public class AuthorizeController {
         accessTokenDTO.setClient_secret(clientSecret);
         String accessToken = githubProvider.getAccessToken(accessTokenDTO);
         GithubUser user = githubProvider.getUser(accessToken);
-        System.out.println(user);
-        return "/index";
+        if (null != user) {
+            request.getSession().setAttribute("user", user);
+            UserDomain domain = new UserDomain();
+            domain.setUserId(String.valueOf(user.getId()));
+            domain.setName(user.getName());
+            domain.setToken(accessToken);
+            domain.setCreateTime(System.currentTimeMillis());
+            domain.setUpdateTime(System.currentTimeMillis());
+            userService.insert(domain);
+        }
+        return "redirect:/index";
     }
-
-
 }
